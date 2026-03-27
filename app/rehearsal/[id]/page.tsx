@@ -42,7 +42,7 @@ export default function RehearsalSession() {
       recognitionRef.current.onend = () => {
         setIsRecording(false)
         if (storage.getSettings().autoAdvance) {
-          setShouldAutoPlay(true)
+          // Just advance - handleNextLine will set shouldAutoPlay if needed
           handleNextLine()
         }
       }
@@ -61,7 +61,9 @@ export default function RehearsalSession() {
 
   // Auto-play AI lines when line changes
   useEffect(() => {
-    if (!script || !shouldAutoPlay) return
+    if (!script || !shouldAutoPlay || isPlaying) {
+      return
+    }
 
     const currentLine = script.lines[currentLineIndex]
     if (!currentLine || currentLine.isUser) {
@@ -71,9 +73,7 @@ export default function RehearsalSession() {
 
     // This is an AI line, play it automatically
     const playAILine = async () => {
-      if (isPlaying) return
-
-      console.log('🎭 Auto-playing AI line:', currentLineIndex)
+      console.log('🎭 Auto-playing AI line:', currentLineIndex, currentLine.character)
       setIsPlaying(true)
       const voiceName = currentLine.character === 'OPHELIA' ? 'Charlotte' : 'Antoni'
 
@@ -99,7 +99,7 @@ export default function RehearsalSession() {
     }
 
     playAILine()
-  }, [currentLineIndex, shouldAutoPlay, script])
+  }, [currentLineIndex, shouldAutoPlay, script, isPlaying])
 
   const handleRecordToggle = () => {
     if (!recognitionRef.current) {
