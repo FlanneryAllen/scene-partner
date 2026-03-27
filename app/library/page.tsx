@@ -137,7 +137,7 @@ export default function Library() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.pdf"
+              accept="text/plain,.txt,.pdf,application/pdf"
               onChange={handleFileImport}
               className="block w-full text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-700 rounded-lg cursor-pointer p-3"
             />
