@@ -16,8 +16,10 @@ export default function RehearsalSession() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recognizedText, setRecognizedText] = useState('')
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
 
   const recognitionRef = useRef<any>(null)
+  const autoAdvanceTimeoutRef = useRef<any>(null)
 
   useEffect(() => {
     const loadedScript = storage.getScript(id)
@@ -40,6 +42,7 @@ export default function RehearsalSession() {
       recognitionRef.current.onend = () => {
         setIsRecording(false)
         if (storage.getSettings().autoAdvance) {
+          setShouldAutoPlay(true)
           handleNextLine()
         }
       }
@@ -50,8 +53,53 @@ export default function RehearsalSession() {
         recognitionRef.current.stop()
       }
       elevenLabs.stop()
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current)
+      }
     }
   }, [id])
+
+  // Auto-play AI lines when line changes
+  useEffect(() => {
+    if (!script || !shouldAutoPlay) return
+
+    const currentLine = script.lines[currentLineIndex]
+    if (!currentLine || currentLine.isUser) {
+      setShouldAutoPlay(false)
+      return
+    }
+
+    // This is an AI line, play it automatically
+    const playAILine = async () => {
+      if (isPlaying) return
+
+      console.log('🎭 Auto-playing AI line:', currentLineIndex)
+      setIsPlaying(true)
+      const voiceName = currentLine.character === 'OPHELIA' ? 'Charlotte' : 'Antoni'
+
+      try {
+        await elevenLabs.speak(currentLine.line, voiceName)
+      } catch (error) {
+        console.error('Error playing line:', error)
+      }
+
+      setIsPlaying(false)
+
+      // Auto-advance to next line if enabled
+      const settings = storage.getSettings()
+      if (settings.autoAdvance && currentLineIndex < script.lines.length - 1) {
+        console.log('🔄 Auto-advancing after pause...')
+        autoAdvanceTimeoutRef.current = setTimeout(() => {
+          setCurrentLineIndex(prev => prev + 1)
+          setShouldAutoPlay(true)
+        }, settings.voiceSettings.pauseDuration * 1000)
+      } else {
+        setShouldAutoPlay(false)
+      }
+    }
+
+    playAILine()
+  }, [currentLineIndex, shouldAutoPlay, script])
 
   const handleRecordToggle = () => {
     if (!recognitionRef.current) {
@@ -96,15 +144,20 @@ export default function RehearsalSession() {
     const settings = storage.getSettings()
     if (settings.autoAdvance && currentLineIndex < script.lines.length - 1) {
       console.log('🔄 Auto-advancing to next line...')
-      setTimeout(() => {
-        const newIndex = currentLineIndex + 1
-        setCurrentLineIndex(newIndex)
+      autoAdvanceTimeoutRef.current = setTimeout(() => {
+        setCurrentLineIndex(prev => prev + 1)
+        setShouldAutoPlay(true)
       }, settings.voiceSettings.pauseDuration * 1000)
     }
   }
 
   const handleNextLine = () => {
     if (!script) return
+
+    // Clear any pending auto-advance
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current)
+    }
 
     // Stop any currently playing audio
     elevenLabs.stop()
@@ -114,34 +167,23 @@ export default function RehearsalSession() {
       const newIndex = currentLineIndex + 1
       setCurrentLineIndex(newIndex)
       const nextLine = script.lines[newIndex]
-      if (!nextLine.isUser) {
-        // Auto-play AI lines after advancing
-        setTimeout(() => {
-          if (isPlaying) return // Don't play if already playing
 
-          setIsPlaying(true)
-          const voiceName = nextLine.character === 'OPHELIA' ? 'Charlotte' : 'Antoni'
-          elevenLabs.speak(nextLine.line, voiceName).then(() => {
-            setIsPlaying(false)
-            // Auto-advance again if enabled
-            const settings = storage.getSettings()
-            if (settings.autoAdvance && newIndex < script.lines.length - 1) {
-              setTimeout(() => {
-                handleNextLine()
-              }, settings.voiceSettings.pauseDuration * 1000)
-            }
-          }).catch(error => {
-            console.error('Error in auto-play:', error)
-            setIsPlaying(false)
-          })
-        }, 500)
+      // If next line is AI and auto-advance is enabled, trigger auto-play
+      if (!nextLine.isUser && storage.getSettings().autoAdvance) {
+        setShouldAutoPlay(true)
       }
     }
   }
 
   const handlePause = () => {
+    // Clear any pending auto-advance
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current)
+    }
+
     elevenLabs.stop()
     setIsPlaying(false)
+    setShouldAutoPlay(false)
     if (recognitionRef.current) {
       recognitionRef.current.stop()
     }
@@ -149,9 +191,15 @@ export default function RehearsalSession() {
   }
 
   const handlePrevLine = () => {
+    // Clear any pending auto-advance
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current)
+    }
+
     // Stop any currently playing audio
     elevenLabs.stop()
     setIsPlaying(false)
+    setShouldAutoPlay(false)
     if (recognitionRef.current) {
       recognitionRef.current.stop()
     }
@@ -364,12 +412,16 @@ export default function RehearsalSession() {
             <div className="text-center mt-4">
               <button
                 onClick={() => {
+                  if (autoAdvanceTimeoutRef.current) {
+                    clearTimeout(autoAdvanceTimeoutRef.current)
+                  }
                   elevenLabs.stop()
                   if (recognitionRef.current) {
                     recognitionRef.current.stop()
                   }
                   setIsPlaying(false)
                   setIsRecording(false)
+                  setShouldAutoPlay(false)
                 }}
                 className="text-red-600 dark:text-red-400 hover:underline text-sm"
               >
