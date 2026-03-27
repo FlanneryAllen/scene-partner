@@ -360,8 +360,26 @@ export default function RehearsalSession() {
                 ⏮️
               </button>
 
-              {/* Pause button - always visible when playing or recording */}
-              {(isPlaying || isRecording) && (
+              {/* Pause and Skip buttons when AI is speaking */}
+              {isPlaying && !currentLine.isUser && (
+                <>
+                  <button
+                    onClick={handlePause}
+                    className="bg-orange-600 hover:bg-orange-700 text-white p-5 rounded-full text-2xl transition-colors shadow-lg"
+                  >
+                    ⏸️
+                  </button>
+                  <button
+                    onClick={handleNextLine}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full text-lg font-semibold transition-colors shadow-lg"
+                  >
+                    Skip ⏩
+                  </button>
+                </>
+              )}
+
+              {/* Pause button when recording */}
+              {isRecording && (
                 <button
                   onClick={handlePause}
                   className="bg-orange-600 hover:bg-orange-700 text-white p-5 rounded-full text-2xl transition-colors shadow-lg"
